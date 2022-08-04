@@ -561,7 +561,916 @@ private:
 
 
 
+## Template Classes + Const Correctness
 
+> theme : make classes
+>
+> * safe
+> * general
+
+### Iterator
+
+```c++
+std::vector a = {1, 2};
+std::vector::iterator it = a.begin();
+```
+
+Iterator is the menber type of the vetcor.
+
+```c++
+//vector.h
+template<typename T> class vector {
+	using iterator = … // something internal
+private:
+	iterator front;
+}
+```
+
+//iterator is a nested type(嵌套类型) in namespace vector::
+
+Templates don’t emit code until instantiated(实例化), so #include the .cpp file in the .h file, not the other way around!
+
+为什么引入它的头文件而不引入实现
+
+* .h  [&#10004;]
+* .cpp [x]
+
+
+
+### Const
+
+> const: keyword indicating a variable, function or parameter can’t be modified
+
+* Can’t declare non-const reference to const variable!
+
+
+
+#### Why Const
+
+* 确保引用类型一致
+* \- We need to promise that it doesn’t by defining them as const functions
+
+
+
+### Simple StrVector
+
+```c++
+class StrVector{
+    public:
+        using iterator = std::string;
+        const size_t kInitialSize = 2;
+
+        size_t size() const;
+        bool empty() const;
+        std::string& at(size_t index);
+        void insert(size_t pos,const std::string& elem);
+        void push_back(const std::string& elem);
+
+        iterator begin();
+        iterator end();
+}
+```
+
+#### Should **begin()** and **end()** be const?
+
+* 如果`it`被人为改动，那么它将报错，为了满足，定义了`cbegin`
+
+
+
+### Sumrize
+
+*  auto will drop all const and &, so be sure to specify
+* Make iterators and const_iterators for all your classes!
+
+
+
+
+
+## Template Functions
+
+How can we write methods that work on any data type?
+
+> Writing reusable, unique code with no duplication!
+
+### 模板
+
+![image-20220730215018870](https://personal-drawing-bed.oss-cn-beijing.aliyuncs.com/img/image-20220730215018870.png)
+
+* typename is some generic type
+  * class == typename
+
+* 可以指定默认值
+
+```c++
+template <typename T=int> // 默认int
+T myMin(const T a,const T b){
+    return a < b ? a:b;
+}
+```
+
+*  调用时指定类型
+
+```c++
+cout << myMin<float>(4.555,3.37888) << endl;
+```
+
+* Template functions can be called (instantiated) **implicitly** or **explicitly**
+* Template parameters can be explicitly provided or **implicitly deduced**
+
+template具体有智能，会自动返回相应的类型
+
+```c++
+template <typename T, typename U>
+auto smartMyMin(T a, U b){
+    return a < b? a:b;
+}
+```
+
+
+
+### 编译template
+
+* Normal functions are created during compile time, and used in runtime. 
+* Template functions are not compiled until used by the code.
+* 每个template函数被编译后,就像一个模板函数被实例化
+
+#### 实例化函数template
+
+* 显式实例化
+  * 在可执行文件中创建函数模板
+* 隐式实例化
+
+
+
+**<重点 难>**
+
+### Template Metaprogramming
+
+> Writing code that runs during compilation (instead of run time)
+
+在编译时运行代码
+
+* make compiled code packages smaller
+* speed up code when it's actually running
+
+
+
+### Why write generic functions?
+
+**一个计数程序的扩展**
+
+* we can solve each of these problems with a single function
+
+```c++
+template <typename T>
+int count_occurrences(const vector<T> vec, T target){
+    int count = 0;
+    for (size_t i = 0; i < vec.size(); i++)
+    {
+        if(vec[i] == target) count++;
+    }
+    return count; 
+}
+
+ cout << count_occurrences<std::string>({"Xadia", "Drakewood", 
+    "Innean"}, "Xadia") << endl;
+```
+
+* 能不能不使用`vector`
+
+```c++
+  template <typename Collection, typename DataType>
+  int count_occurrences(const Collection& arr, DataType target){
+       int count = 0;
+       for (size_t i = 0; i < arr.size(); ++i){
+       	if (arr[i] == target) count++;
+   	}
+   	return count;
+  }
+  Usage: count_occurrences({"Xadia", "Drakewood", "Innean"}, "Xadia"); 
+```
+
+* The collection may not be indexable. How do we solve this?  
+  * iterator
+
+
+```c++
+template <typename InputIt, typename DataType>
+int count_occurrences(InputIt begin, InputIt end, DataType target){
+    int count = 0;
+    for (auto iter = begin; iter != end; iter++){
+        const auto& elem = *iter;
+        if(elem == target) count++;
+    }
+    return count;
+}
+```
+
+  
+
+## Functions and Lambdas
+
+### Function Pointers and Lambdas
+
+#### Predicate Functions
+
+bool -> is -> 是或者不是 中文为谓语动词
+
+```c++
+bool isVowel(char c) {
+    std::string vowels = "aeiou";
+    return vowels.find(c) != std::string::npos;
+}
+```
+
+计数函数又一次升级，定制化条件。（利用函数指针）
+
+```c++
+bool isVowel(char c){
+    std::string vowels = "iaiyou";
+    return vowels.find(c) != std::string::npos;
+}
+
+template <typename InputIt, typename UnPred>
+int count_occurrences(InputIt begin, InputIt end, UnPred pred){
+    int count = 0;
+    for (auto iter = begin; iter != end; iter++){
+        const auto& elem = *iter;
+        if(pred(elem)) count++;
+    }
+    return count;
+}
+
+int main(){
+    std::string str = "Xadia";
+    cout << count_occurrences(str.begin(), str.end(), isVowel);
+}
+```
+
+
+
+### Lambdas
+
+Can we create functions with more ways to input information than just parameters?
+
+#### 模板
+
+```c++
+auto var = [capture-clause] (auto param) -> bool{
+	...
+}
+```
+
+* auto var 类似变量的声明
+* [   ]捕获条件：触发机制
+* auto param ： 使用的参数
+* bool : 返回值 
+
+#### 计数程序超进化
+
+```c++
+template <typename InputIt, typename UnPred>
+int count_occurrences(InputIt begin, InputIt end, UnPred pred){
+    int count = 0;
+    for (auto iter = begin; iter != end; iter++){
+        const auto& elem = *iter;
+        if(pred(elem)) count++;
+    }
+    return count;
+}
+
+
+int main(int argc, char const *argv[])
+{
+    // auto printNum = [] (int n) -> void {
+    //     cout << n << endl;
+    // };
+
+    // printNum(5);
+
+    int limit = 5;
+    auto isMoreThan = [limit] (int n) -> bool{
+        return n > limit;
+    };
+    std::vector<int> nums = {3,5,6,7,9,13};
+    cout << count_occurrences(nums.begin(), nums.end(),isMoreThan) << endl; 
+
+    return 0;
+}
+
+```
+
+* Use lambdas when you need a short function, or one with read/write access to local variables!
+* Use function pointers for longer logic and for overloading.(复杂逻辑和函数指针)
+
+
+
+#### Operator()
+
+another way to create function
+
+```c++
+class functor{
+    public:
+        int operator() (int arg) const{
+            return num + arg;
+        }
+    private:
+        int num;
+};
+```
+
+A functor is any class that provides an implementation of operator().
+
+
+
+### functors, lambdas, and function pointers relate
+
+std::function is a complex, heavy, expensive, magical type that can hold any callable entity.
+
+
+
+## Midquarter Review
+
+### References
+
+bug:
+
+```txt
+unable to deduce 'std::initializer_list<auto>' from '{{1, 1}}'
+```
+
+```c++
+auto my_nums = {{1,1}};
+// 直接初始化vector存在的问题，编译器可能不够高级
+```
+
+
+
+
+
+## Operator Overloading
+
+### Time demo
+
+Why are the arguments const?
+
+```c++
+bool before(const Time& a, const Time& b) {
+    if (a.getHours() < b.getHours()) return true;
+    if (b.getHours() < a.getHours()) return false;
+    // otherwise, compare minutes
+    if (a.getMinutes() < b.getMinutes()) return true;
+    if (b.getMinutes() < a.getMinutes()) return false;
+    // otherwise compare seconds...
+}
+```
+
+const 引用传参
+
+1.使用const可以避免无意中修改数据的编程错误
+
+2.使用cosnt使函数能够处理const和非const实参，否则将只能接受非const数据，因为一个const数据是不能赋给一个非const数据的
+
+3.使用const引用使函数能够正确生成并使用临时变量。
+
+
+
+### Overload operators
+
+* member functions
+* non-member functions 
+
+
+
+### 函数重载与运算符重载
+
+C++ 允许在同一作用域中的某个**函数**和**运算符**指定多个定义，分别称为**函数重载**和**运算符重载**。
+
+#### 函数重载
+
+```c++
+ public:
+      void print(int i) {
+        cout << "整数为: " << i << endl;
+      }
+ 
+      void print(double  f) {
+        cout << "浮点数为: " << f << endl;
+      }
+ 
+      void print(char c[]) {
+        cout << "字符串为: " << c << endl;
+      }
+```
+
+#### 运算符重载
+
+重载的运算符是带有特殊名称的函数，函数名是由关键字 operator 和其后要重载的运算符符号构成的。与其他函数一样，重载运算符有一个返回类型和一个参数列表。
+
+可分为成员与非成员，成员函数可访问内部变量：
+
+#### ++运算符的重载
+
+ 为了区分这两者，观察到以下规则：运算符的前缀形式与任何其他一元运算符的声明方式完全相同：后缀表单接受类型 **`int`**的额外参数。
+
+表示递增或递减运算符的后缀形式的参数 **`int`** 通常不用于传递参数。 它通常包含值 0。 但是，可按以下方式使用它：
+
+```c++
+Int Int::operator++( int n )
+{
+    Int result = *this;
+    if( n != 0 )    // Handle case where an argument is passed.
+        _i += n;
+    else
+        _i++;       // Handle case where no argument is passed.
+    return result;
+}
+```
+
+#### friend
+
+You may be wondering how non-member functions can access private member variables! 
+
+让非成员函数访问私有变量。
+
+#### << operator 重载
+
+* 重新定义输入
+
+
+
+## Special Member Function
+
+covers the barebones 涵盖了基础的class
+
+### Question
+
+* What are special member functions? When are they called? 
+* When should we declare a special member function? 
+* When should we not declare a special member function? 
+* What are modern standards for SMFs? How do they differ from classic, C++98 standards?
+
+
+
+### What
+
+These functions are generated only when they're called (and before any are explicitly defined by you)
+
+联想单例设计模式：
+
+* 懒汉：使用时完成初始化
+* 饿汉：加载时完成初始化
+
+构造器的更多玩法
+
+
+
+### 组成
+
+#### copy constructor
+
+> 用Java里的话说 深拷贝 deep copy
+
+####  copy assignment operator
+
+=，创造对象，类似深拷贝
+
+#### destructor
+
+can be used for deallocating member variables and avoiding memory leaks
+
+
+
+### Depth
+
+### initializer list
+
+> 创建即分配
+
+```c++
+template <typename T>
+vector<T>::vector<T>() :  // 注意:
+_size(0),_capacity(kInitialSiz),
+_elems(new T[kInitialSize]){ }
+```
+
+* Faster
+* 不可分配咋办？
+
+
+
+#### Why aren’t sufficient?
+
+* default:manually copying each member variable
+* Moral of the story: in many cases, copying is not as simple as copying each member variable!
+* Both copy and vec will point to the same underlying array!
+
+
+
+#### How to fix?
+
+1. initializer list 
+2. 处理 edge cases;
+3. return 自己的指针
+
+
+
+#### 拷贝总结
+
+1. Check for self-assignment
+2. Make sure to free existing members
+3. Copy assign （automatically assignable member）
+4. Manually coy all members
+5. Return a reference to *this
+
+
+
+### Prevent copies
+
+keep SMFs if you're overwriting them
+
+```c++
+PasswordManager(const PasswordManager& rhs) = delete;
+PasswordManager& operator = (const PasswordManager& rhs) = delete;
+```
+
+告诉编译器自己不用他们的拷贝
+
+如果是重写拷贝
+
+```c++
+Widget (const Widget& w) = default;
+```
+
+after a function prototype tells C++ to still generate the default SMF, even if you're defining other SMFs!
+
+
+
+### When should we rewrite SMFs?
+
+….
+
+
+
+## Move Sematics in C++
+
+> C++ 11 
+
+A fancy way to say “how can we avoid making unnecessary copies of resources?”
+
+数据移动而非拷贝！
+
+
+
+### l-values vs R-values
+
+* name
+* not temporary
+
+l-values live until the end of the scope , r-values live until the end of the line
+
+#### r-value reference `&&`
+
+让函数参数传递r-value变为可能
+
+```c++
+void change(int&& num){
+    cout << "r-value:"<< num << " is changed" <<endl;
+}
+
+void change(int& num){
+    cout << "l-value:"<< num << " is changed" <<endl;
+}
+```
+
+![image-20220803223030760](https://personal-drawing-bed.oss-cn-beijing.aliyuncs.com/img/image-20220803223030760.png)
+
+### steal the array
+
+* cast `l-value` to `r-value`
+
+```c++
+change(std::move(x));
+```
+
+![image-20220803230834696](https://personal-drawing-bed.oss-cn-beijing.aliyuncs.com/img/image-20220803230834696.png)
+
+### warning
+
+look at this code:
+
+```c++
+int main() {
+    vector<string> vec1 = {“hello”, “world”}
+    vector<string> vec2 = std::move(vec1);
+    vec1.push_back(“Sure hope vec2 doesn’t see this!”)
+        // mistake 
+}
+```
+
+* After a variable is moved via std::move, it should never be used until it is reassigned to a new variable! 
+
+*  The C++ compiler might warn you about this mistake, but the code above compiles!
+
+
+
+#### When
+
+Don’t use std::move outside of **class definitions**, never use it in **application code**!
+
+
+
+
+
+## Type Safety and std::optional
+
+> How can we use c++’s type system to prevent errors at compile time?
+
+const :
+
+* 将大块数据传递给函数，来避免复制。
+* 防止不经意间或者偷偷将数据改变 (accidentally or sneakily changes)
+
+
+
+### Prevent type error
+
+> How to prevent the  back when use {} ?
+
+`std::vector back: {}`
+
+Returns a reference to the last element in the container.
+
+Calling `back` on an empty container causes [undefined behavior](https://en.cppreference.com/w/cpp/language/ub).
+
+Undefined behavior: Function could crash, could give us garbage, could accidentally give us some actual value
+
+#### first solution:
+
+```c++
+template <typename valuetype>
+std::pair<bool, valuetype&> vector<valuetype>::back(){
+    if(empty()){
+        return {false, valuetype()};
+    }
+    return {true, *(begin() + size() -1)};
+}
+```
+
+* 受返回值类型影响，如果是void中呢？
+
+
+
+### Introducing std::optional
+
+std::optional is a **template class** which will either contain a value of type T
+or **contain nothing** (expressed as nullopt)
+
+
+
+#### interface
+
+```c++
+std::optional<Student> lookupStudent(string name){//something}
+std::optional<Student> output = lookupStudent(“Keith”);
+    
+if(student.has_value()){
+	cout << output.value().name << “ is from “ <<
+	output.value().state << endl;
+} else {
+	cout << “No student found” << endl;
+}
+```
+
+* .value :
+  * contained value or throws bad_optional_access
+* .value_or(value type val) 
+  * returns the contained value or default value, parameter val
+* .has_value()
+  * returns true if contained value exists, false otherwise
+
+
+
+#### back use 进化
+
+```c++
+void removeOddsFromEnd(vector<int>& vec){
+	while(vec.back().value() % 2 == 1){
+		vec.pop_back();
+	}
+}
+```
+
+如果vetor是空值，将抛出错误 ` bad_optional_access`
+
+如何改进？？？
+
+```c++
+while(vec.back().has_value() && vec.back().value() % 2 ==1) 
+```
+
+too long
+
+```c++
+while(vec.back() && vec.back().value() % 2 ==1)
+```
+
+hacky 写法
+
+```c++
+while(vec.back().value_or(2) % 2 == 1)
+    // Totally hacky, but totally works ;) don’t do this ;)
+```
+
+
+
+## RAII, Smart Pointers, and C++ Project Building
+
+### 课前预习
+
+#### RALL:
+
+> Resource Acquisition Is Initialization 获取资源立即初始化
+
+C++语言局部对象自动销毁的特性来控制资源的生命周期
+
+```c++
+class  MutexLock {
+ public:
+  explicit MutexLock(Mutex *mu) // RALL
+      : mu_(mu)  {
+    this->mu_->Lock();
+  }
+  ~MutexLock() { this->mu_->Unlock(); }
+
+ private:
+  Mutex *const mu_;
+  // No copying allowed
+  MutexLock(const MutexLock&) = delete;
+  void operator=(const MutexLock&) = delete;
+};
+```
+
+#### Smart Pointer
+
+* 智能释放空间
+
+Since the destructor is automatically called when an object goes out of scope, the dynamically allocated memory would automatically be deleted (or reference count can be decremented).
+
+* 模板类的实现
+
+```c++
+#include <iostream>
+
+using std::cout; using std::endl;
+
+template <class T>
+class SmartPtr{
+    T* ptr;
+    public:
+        explicit SmartPtr(T* p = NULL) : ptr(p){cout << "Initial ptr" <<endl; }
+        ~SmartPtr(){ cout << "delete the ptr" << endl;delete (ptr);}
+        T& operator*(){ return *ptr;}
+        T* operator->() {return ptr;}
+};   
+
+int main(int argc, char const *argv[])
+{
+    SmartPtr<int> ptr(new int());
+    *ptr = 20;
+    cout << "*ptr: "<< *ptr << endl;
+    return 0;
+}
+
+```
+
+![image-20220804165937807](https://personal-drawing-bed.oss-cn-beijing.aliyuncs.com/img/image-20220804165937807.png)
+
+
+
+#### 真实的智能指针
+
+##### **1.unique_ptr**
+
+![image-20220804174021812](https://personal-drawing-bed.oss-cn-beijing.aliyuncs.com/img/image-20220804174021812.png)
+
+```c++
+#include <iostream>
+#include <memory>
+
+using std::cout; using std::endl;
+
+class Rectangle{
+    int length;
+    int breadth;
+
+    public:
+        Rectangle(const int &l,const int &b) 
+            : length(l), breadth(b){ 
+                cout << "Initial SPTR" << endl;
+            }
+        
+        ~Rectangle(){
+            cout << "destroy the SPTR" << endl;
+        }
+        
+        const int area(){
+            return length * breadth;
+        }
+};
+
+int main(int argc, char const *argv[])
+{
+    std::unique_ptr<Rectangle> P1(new Rectangle(10,5));
+    cout << P1->area() << endl;
+
+    std::unique_ptr<Rectangle> P2;
+    // 转移而不是拷贝
+    P2 = std::move(P1);
+
+    // 对比P1 和 P2
+    cout << "P2: " << P2->area() << endl;
+    // 段错误直接退出程序
+    // cout << "P1: " <<P1->area() << endl;
+
+    return 0;
+}
+
+```
+
+![image-20220804174519536](https://personal-drawing-bed.oss-cn-beijing.aliyuncs.com/img/image-20220804174519536.png)
+
+可以看出，P2并未使用构造函数生成新的空间，而且P2完美复刻了P1。
+
+
+
+##### 2.shared_ptr
+
+![image-20220804174711101](https://personal-drawing-bed.oss-cn-beijing.aliyuncs.com/img/image-20220804174711101.png)
+
+```c++
+std::shared_ptr<Rectangle> P1(new Rectangle(10, 5));
+std::shared_ptr<Rectangle> P2 = P1;
+
+cout << "P1:" << P1->area() << endl;
+cout << "P2:" << P2->area() << endl;
+
+cout << "count:" << P1.use_count() << endl;
+```
+
+![image-20220804175034761](https://personal-drawing-bed.oss-cn-beijing.aliyuncs.com/img/image-20220804175034761.png)
+
+
+
+### Problem
+
+Takeaway: there are often more code paths than meets the eye!
+
+#### What’s Wrong
+
+```c++
+string get_name_and_print_sweet_tooth(int id_number) {
+     Person* p = new Person(id_number); // copy waste
+        // assume the constructor fills in variables
+    if (p->favorite_food() == "chocolate" ||
+         p->favorite_drink() == "milkshake") {
+            cout << p->first() << " "
+             << p->last() << " has a sweet tooth!" << endl;
+}
+    auto result = p->first() + " " + p->last();
+    delete p;
+    return result;
+}
+```
+
+
+
+### Smart Pointer
+
+#### Another way
+
+> * make_unique<> 
+>
+> * make_shared<>
+
+**Always use std::make_unique()!**
+
+
+
+### Program Progrcess
+
+.cpp -> .s -> .o -> executable
+
+1. cpp语言文件编译生成汇编代码
+
+2. 汇编代码转换为二进制代码
+3. 从多个对象文件发创建一个可执行文件
+   1. 合并程序的各个部分  (combine)
+   2. memory organizayion 创建新的内存结构
+   3. 解决引用问题
+
+![image-20220804182630167](https://personal-drawing-bed.oss-cn-beijing.aliyuncs.com/img/image-20220804182630167.png)
 
 
 
