@@ -7,6 +7,8 @@
 
 | 课程名                          | 仓库地址                                                     |
 | ------------------------------- | ------------------------------------------------------------ |
-| CS106L:Standard C++ Programming | https://github.com/dmucby/CS-Cousrse/tree/master/CS106L      |
+| Linux C一站式学习               |                                                              |
+| CS106L:Standard C++ Programming | https://github.com/dmucby/CS-Course/tree/master/CS106L       |
+| R语言教程                       |                                                              |
 | PyTorch Tutorials               | https://github.com/dmucby/CS-Course/tree/master/PyTorch_Tutorial |
 
